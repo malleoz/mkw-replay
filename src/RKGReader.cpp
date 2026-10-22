@@ -221,6 +221,8 @@ uint8_t RKGReader::RawToStick(uint8_t raw) const {
 
 GCPadStatus RKGReader::CalcFrame(uint16_t frame) {
     constexpr uint16_t FRAMES_AFTER_RECONNECT = 283;
+    static bool s_shouldUseB = true;
+    static uint8_t s_prevFaceData = 0;
 
     GCPadStatus ret = s_defaultGCPadStatus;
 
@@ -239,8 +241,21 @@ GCPadStatus RKGReader::CalcFrame(uint16_t frame) {
     DPad trickData = CalcTrick(frame);
 
     ret.a = !!(faceData & 0x01);
-    ret.b = !!(faceData & 0x02);
     ret.l = !!(faceData & 0x04);
+
+    // If the input data contains a reverse hop, swap the brake button being used
+    if (frame > m_frameCount && !!(s_prevFaceData & 0x02) && !(s_prevFaceData & 0x08) &&
+            !!(faceData & 0x08)) {
+        s_shouldUseB = !s_shouldUseB;
+    }
+
+    if (s_shouldUseB) {
+        ret.b = !!(faceData & 0x02);
+    } else {
+        ret.r = !!(faceData & 0x02);
+    }
+
+    s_prevFaceData = faceData;
 
     ret.xStick = RawToStick(dirData >> 4 & 0x0F);
     ret.yStick = RawToStick(dirData & 0x0F);
